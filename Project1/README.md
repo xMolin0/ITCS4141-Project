@@ -6,6 +6,56 @@ You should implement the filtering algorithms according to the algorithms in [FI
 ## Source Code to Start
 The skeleton code are provided in [Filtering.cpp](Filtering.cpp). You should also check [CMakeLists.txt](CMakeLists.txt) to see how they will be built to executables using cmake/make/gcc utilities. [README.md](README.md) provide instructions for how to build all executables at once. The intial source code of [Filtering.cpp](Filtering.cpp) file is a copy from [changing the contrast and brightness of an image](https://docs.opencv.org/3.4.0/d3/dc1/tutorial_basic_linear_transform.html). The methods for reading/writing/displaying an image and for getting/setting a pixel value of an image are pretty simple in OpenCV, which can be found from [this short description with code sample for operating images](https://docs.opencv.org/3.4.0/d5/d98/tutorial_mat_operations.html). The FilteringOpenCV.cpp file for OpenCV image processing are all from the OpenCV tutorial and they are for your reference only, which calls OpenCV implemented filtering. Your implementation should use loops to apply pixel-wise computation according to the convolution algorithms implemented in FILTER.c. 
 
+## MacOs requirements
+
+This project requires both **OpenCV** and **OpenMP**. On macOS, additional setup is needed because the default compiler (Apple Clang) has openMP disabled by defualt.
+
+---
+
+## Install Dependencies (Homebrew)
+
+Install Homebrew if you don’t have it: https://brew.sh
+
+Then install required packages:
+
+```bash
+brew install opencv
+brew install libomp
+brew install gcc
+```
+
+---
+
+## ⚠️ Important: Use GCC (not Clang)
+
+macOS defaults to **Apple Clang**, even when using `gcc`.
+To properly compile with OpenMP, you must explicitly use a Homebrew GCC version (e.g., `g++-15` or higher).
+
+Check installed versions:
+
+```bash
+ls /opt/homebrew/bin/g++-*
+```
+
+Example compiler:
+
+```bash
+g++-15
+```
+
+
+## To Build
+
+1. Create build directory (only once):
+
+```bash
+mkdir build
+```
+
+2. Generate Makefile (only once):
+
+```bash
+
 ## To Build
  1. clone this repo and cd to the clone work folder. 
  1. `mkdir build`, **only do once**. 
