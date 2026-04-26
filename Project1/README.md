@@ -26,7 +26,7 @@ brew install gcc
 
 ---
 
-## ⚠️ Important: Use GCC (not Clang)
+## Important: Use GCC (not Clang)
 
 macOS defaults to **Apple Clang**, even when using `gcc`.
 To properly compile with OpenMP, you must explicitly use a Homebrew GCC version (e.g., `g++-15` or higher).
