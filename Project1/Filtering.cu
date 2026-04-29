@@ -24,6 +24,7 @@ Core CUDA idea:
 */
 
 #include <iostream>
+#include <chrono>
 #include <cuda_runtime.h>
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
@@ -131,7 +132,7 @@ then clamps result to [0,255].
 __global__ void convolutionKernel(
     unsigned char* src,
     unsigned char* dst,
-    size_t pitch,
+    size_t rowStride,
     int width,
     int height,
     int* filter,
@@ -157,7 +158,7 @@ __global__ void convolutionKernel(
 
     for (int dy = -1; dy <= 1; dy++)
     {
-        uchar3* row = (uchar3*)(src + (y + dy) * pitch);
+        uchar3* row = (uchar3*)(src + (y + dy) * rowStride);
 
         for (int dx = -1; dx <= 1; dx++)
         {
@@ -184,7 +185,7 @@ __global__ void convolutionKernel(
     result.y = green;
     result.z = red;
 
-    uchar3* outRow = (uchar3*)(dst + y * pitch);
+    uchar3* outRow = (uchar3*)(dst + y * rowStride);
     outRow[x] = result;
 }
 
@@ -232,7 +233,7 @@ Instead of averaging:
 __global__ void medianKernel(
     unsigned char* src,
     unsigned char* dst,
-    size_t pitch,
+    size_t rowStride,
     int width,
     int height
 )
@@ -252,7 +253,7 @@ __global__ void medianKernel(
 
     for (int dy = -1; dy <= 1; dy++)
     {
-        uchar3* row = (uchar3*)(src + (y + dy) * pitch);
+        uchar3* row = (uchar3*)(src + (y + dy) * rowStride);
 
         for (int dx = -1; dx <= 1; dx++)
         {
@@ -275,7 +276,7 @@ __global__ void medianKernel(
     result.y = green[4];
     result.z = red[4];
 
-    uchar3* outRow = (uchar3*)(dst + y * pitch);
+    uchar3* outRow = (uchar3*)(dst + y * rowStride);
     outRow[x] = result;
 }
 
@@ -291,7 +292,7 @@ Take smallest value from 3x3 area
 __global__ void minKernel(
     unsigned char* src,
     unsigned char* dst,
-    size_t pitch,
+    size_t rowStride,
     int width,
     int height
 )
@@ -309,7 +310,7 @@ __global__ void minKernel(
 
     for (int dy = -1; dy <= 1; dy++)
     {
-        uchar3* row = (uchar3*)(src + (y + dy) * pitch);
+        uchar3* row = (uchar3*)(src + (y + dy) * rowStride);
 
         for (int dx = -1; dx <= 1; dx++)
         {
@@ -323,7 +324,7 @@ __global__ void minKernel(
 
     uchar3 result = {minB, minG, minR};
 
-    uchar3* outRow = (uchar3*)(dst + y * pitch);
+    uchar3* outRow = (uchar3*)(dst + y * rowStride);
     outRow[x] = result;
 }
 
@@ -339,7 +340,7 @@ Take largest value from 3x3 area
 __global__ void maxKernel(
     unsigned char* src,
     unsigned char* dst,
-    size_t pitch,
+    size_t rowStride,
     int width,
     int height
 )
@@ -357,7 +358,7 @@ __global__ void maxKernel(
 
     for (int dy = -1; dy <= 1; dy++)
     {
-        uchar3* row = (uchar3*)(src + (y + dy) * pitch);
+        uchar3* row = (uchar3*)(src + (y + dy) * rowStride);
 
         for (int dx = -1; dx <= 1; dx++)
         {
@@ -371,7 +372,7 @@ __global__ void maxKernel(
 
     uchar3 result = {maxB, maxG, maxR};
 
-    uchar3* outRow = (uchar3*)(dst + y * pitch);
+    uchar3* outRow = (uchar3*)(dst + y * rowStride);
     outRow[x] = result;
 }
 
@@ -399,7 +400,7 @@ int main()
     int width = image.cols;
     int height = image.rows;
 
-    size_t rowBytes = width * 3;
+    size_t rowBytes = static_cast<size_t>(width) * sizeof(uchar3);
 
     /*
     Allocate GPU memory
@@ -407,34 +408,33 @@ int main()
 
     unsigned char* d_src;
     unsigned char* d_dst;
-    size_t pitch;
 
-    CUDA_CHECK(cudaMallocPitch(
+    CUDA_CHECK(cudaMalloc(
         &d_src,
-        &pitch,
-        rowBytes,
-        height
+        rowBytes * height
     ));
 
-    CUDA_CHECK(cudaMallocPitch(
+    CUDA_CHECK(cudaMalloc(
         &d_dst,
-        &pitch,
-        rowBytes,
-        height
+        rowBytes * height
     ));
 
     /*
     Copy CPU -> GPU
     */
 
-    CUDA_CHECK(cudaMemcpy2D(
+    CUDA_CHECK(cudaMemcpy(
         d_src,
-        pitch,
         image.ptr(),
-        image.step,
-        rowBytes,
-        height,
+        rowBytes * height,
         cudaMemcpyHostToDevice
+    ));
+
+    CUDA_CHECK(cudaMemcpy(
+        d_dst,
+        d_src,
+        rowBytes * height,
+        cudaMemcpyDeviceToDevice
     ));
 
     /*
@@ -519,10 +519,12 @@ int main()
             cudaMemcpyHostToDevice
         ));
 
+        auto kernelStart = chrono::high_resolution_clock::now();
+
         convolutionKernel<<<gridSize, blockSize>>>(
             d_src,
             d_dst,
-            pitch,
+            rowBytes,
             width,
             height,
             d_filter,
@@ -531,28 +533,54 @@ int main()
 
         CUDA_CHECK(cudaDeviceSynchronize());
 
+        auto kernelEnd = chrono::high_resolution_clock::now();
+        auto kernelMs = chrono::duration_cast<chrono::duration<double, std::milli>>(kernelEnd - kernelStart).count();
+        cout << "Kernel time: " << kernelMs << " ms\n";
+
         cudaFree(d_filter);
     }
     else if (choice == 9)
     {
+        auto kernelStart = chrono::high_resolution_clock::now();
+
         medianKernel<<<gridSize, blockSize>>>(
-            d_src, d_dst, pitch, width, height
+            d_src, d_dst, rowBytes, width, height
         );
+
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        auto kernelEnd = chrono::high_resolution_clock::now();
+        auto kernelMs = chrono::duration_cast<chrono::duration<double, std::milli>>(kernelEnd - kernelStart).count();
+        cout << "Kernel time: " << kernelMs << " ms\n";
     }
     else if (choice == 10)
     {
+        auto kernelStart = chrono::high_resolution_clock::now();
+
         minKernel<<<gridSize, blockSize>>>(
-            d_src, d_dst, pitch, width, height
+            d_src, d_dst, rowBytes, width, height
         );
+
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        auto kernelEnd = chrono::high_resolution_clock::now();
+        auto kernelMs = chrono::duration_cast<chrono::duration<double, std::milli>>(kernelEnd - kernelStart).count();
+        cout << "Kernel time: " << kernelMs << " ms\n";
     }
     else
     {
-        maxKernel<<<gridSize, blockSize>>>(
-            d_src, d_dst, pitch, width, height
-        );
-    }
+        auto kernelStart = chrono::high_resolution_clock::now();
 
-    CUDA_CHECK(cudaDeviceSynchronize());
+        maxKernel<<<gridSize, blockSize>>>(
+            d_src, d_dst, rowBytes, width, height
+        );
+
+        CUDA_CHECK(cudaDeviceSynchronize());
+
+        auto kernelEnd = chrono::high_resolution_clock::now();
+        auto kernelMs = chrono::duration_cast<chrono::duration<double, std::milli>>(kernelEnd - kernelStart).count();
+        cout << "Kernel time: " << kernelMs << " ms\n";
+    }
 
     /*
     Copy GPU -> CPU
@@ -560,13 +588,10 @@ int main()
 
     Mat result(height, width, CV_8UC3);
 
-    CUDA_CHECK(cudaMemcpy2D(
+    CUDA_CHECK(cudaMemcpy(
         result.ptr(),
-        result.step,
         d_dst,
-        pitch,
-        rowBytes,
-        height,
+        rowBytes * height,
         cudaMemcpyDeviceToHost
     ));
 

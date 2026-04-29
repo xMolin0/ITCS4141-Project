@@ -71,7 +71,7 @@ int hpf_filter_3[3][3] = {
  * @param divisor - Normalization divisor (sum of filter weights)
  * @return - Filtered image
  */
-Mat applyConvolutionFilter(Mat src, int filter[3][3]) {
+Mat applyConvolutionFilter(Mat src, int filter[3][3], int chunkSize) {
     Mat dst = Mat::zeros(src.size(), src.type());
     int rows = src.rows;
     int cols = src.cols;
@@ -89,6 +89,7 @@ Mat applyConvolutionFilter(Mat src, int filter[3][3]) {
 
     cout << "Using divisor: " << divisor << endl;
 
+    #pragma omp parallel for schedule(static, chunkSize)
     for (int i = 1; i < rows - 1; i++) {
         for (int j = 1; j < cols - 1; j++) {
             for (int c = 0; c < 3; c++) {
@@ -120,11 +121,12 @@ Mat applyConvolutionFilter(Mat src, int filter[3][3]) {
  * Collects the 9 neighborhood values for each channel, sorts them,
  * and writes back the middle value.
  */
-Mat applyMedianFilter(Mat src) {
+Mat applyMedianFilter(Mat src, int chunkSize) {
     Mat dst = src.clone();
     int rows = src.rows;
     int cols = src.cols;
 
+    #pragma omp parallel for schedule(static, chunkSize)
     for (int i = 1; i < rows - 1; i++) {
         for (int j = 1; j < cols - 1; j++) {
             for (int c = 0; c < 3; c++) {
@@ -152,11 +154,12 @@ Mat applyMedianFilter(Mat src) {
  * applyLowPixelFilter - Apply a 3x3 low-pixel filter to an RGB image.
  * Replaces each center pixel with the minimum value from its neighborhood.
  */
-Mat applyLowPixelFilter(Mat src) {
+Mat applyLowPixelFilter(Mat src, int chunkSize) {
     Mat dst = src.clone();
     int rows = src.rows;
     int cols = src.cols;
 
+    #pragma omp parallel for schedule(static, chunkSize)
     for (int i = 1; i < rows - 1; i++) {
         for (int j = 1; j < cols - 1; j++) {
             for (int c = 0; c < 3; c++) {
@@ -181,11 +184,12 @@ Mat applyLowPixelFilter(Mat src) {
  * applyHighPixelFilter - Apply a 3x3 high-pixel filter to an RGB image.
  * Replaces each center pixel with the maximum value from its neighborhood.
  */
-Mat applyHighPixelFilter(Mat src) {
+Mat applyHighPixelFilter(Mat src, int chunkSize) {
     Mat dst = src.clone();
     int rows = src.rows;
     int cols = src.cols;
 
+    #pragma omp parallel for schedule(static, chunkSize)
     for (int i = 1; i < rows - 1; i++) {
         for (int j = 1; j < cols - 1; j++) {
             for (int c = 0; c < 3; c++) {
@@ -242,46 +246,53 @@ int main( int argc, char** argv )
     int choice;
     cin >> choice;
 
+    cout << "Enter chunk size for schedule(static, chunk): ";
+    int chunkSize;
+    cin >> chunkSize;
+    if (chunkSize < 1) {
+        chunkSize = 1;
+    }
+
     Mat filtered;
     auto filterStart = chrono::high_resolution_clock::now();
 
     switch (choice) {
         case 1:
-            filtered = applyConvolutionFilter(image, lpf_filter_6);
+            filtered = applyConvolutionFilter(image, lpf_filter_6, chunkSize);
             break;
         case 2:
-            filtered = applyConvolutionFilter(image, lpf_filter_9);
+            filtered = applyConvolutionFilter(image, lpf_filter_9, chunkSize);
             break;
         case 3:
-            filtered = applyConvolutionFilter(image, lpf_filter_10);
+            filtered = applyConvolutionFilter(image, lpf_filter_10, chunkSize);
             break;
         case 4:
-            filtered = applyConvolutionFilter(image, lpf_filter_16);
+            filtered = applyConvolutionFilter(image, lpf_filter_16, chunkSize);
             break;
         case 5:
-            filtered = applyConvolutionFilter(image, lpf_filter_32);
+            filtered = applyConvolutionFilter(image, lpf_filter_32, chunkSize);
             break;
         case 6:
-            filtered = applyConvolutionFilter(image, hpf_filter_1);
+            filtered = applyConvolutionFilter(image, hpf_filter_1, chunkSize);
             break;
         case 7:
-            filtered = applyConvolutionFilter(image, hpf_filter_2);
+            filtered = applyConvolutionFilter(image, hpf_filter_2, chunkSize);
             break;
         case 8:
-            filtered = applyConvolutionFilter(image, hpf_filter_3);
+            filtered = applyConvolutionFilter(image, hpf_filter_3, chunkSize);
             break;
         case 9:
-            filtered = applyMedianFilter(image);
+            filtered = applyMedianFilter(image, chunkSize);
             break;
         case 10:
-            filtered = applyLowPixelFilter(image);
+            filtered = applyLowPixelFilter(image, chunkSize);
             break;
         case 11:
-            filtered = applyHighPixelFilter(image);
+            filtered = applyHighPixelFilter(image, chunkSize);
             break;
         default:
             cout << "Invalid choice. Using default blur.\n";
-            filtered = applyConvolutionFilter(image, lpf_filter_9);
+            filtered = applyConvolutionFilter(image, lpf_filter_9, chunkSize);
     }
 
     auto filterEnd = chrono::high_resolution_clock::now();
