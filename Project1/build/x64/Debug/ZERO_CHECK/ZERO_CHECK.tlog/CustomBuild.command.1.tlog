@@ -1,0 +1,10 @@
+^C:\USERS\XAVIE\ONEDRIVE\DOCUMENTS\GITHUB\ITCS4141-PROJECT\PROJECT1\BUILD\CMAKEFILES\F530E359B7E05EABEF4DE185AB31944C\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Users/xavie/OneDrive/Documents/GitHub/ITCS4141-Project/Project1 -BC:/Users/xavie/OneDrive/Documents/GitHub/ITCS4141-Project/Project1/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/xavie/OneDrive/Documents/GitHub/ITCS4141-Project/Project1/build/OpenCVExample.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

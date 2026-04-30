@@ -98,17 +98,6 @@ CUDA ERROR CHECKER
 ============================================================
 */
 
-#define CUDA_CHECK(call)                                      \
-do {                                                          \
-    cudaError_t err = call;                                   \
-    if (err != cudaSuccess) {                                 \
-        cout << "CUDA Error: "                                \
-             << cudaGetErrorString(err)                       \
-             << " at line " << __LINE__ << endl;              \
-        exit(EXIT_FAILURE);                                   \
-    }                                                         \
-} while(0)
-
 
 /*
 ============================================================
@@ -362,7 +351,7 @@ __global__ void maxKernel(
 
         for (int dx = -1; dx <= 1; dx++)
         {
-            uchar3 pixel = row[x + dx];
+            uchar3 pixel = *(row + (x + dx));
 
             if (pixel.x > maxB) maxB = pixel.x;
             if (pixel.y > maxG) maxG = pixel.y;
@@ -388,8 +377,9 @@ int main()
     /*
     Load image
     */
-
     Mat image = imread("../data/lena.jpg");
+
+    
 
     if (image.empty())
     {
@@ -400,7 +390,14 @@ int main()
     int width = image.cols;
     int height = image.rows;
 
-    size_t rowBytes = static_cast<size_t>(width) * sizeof(uchar3);
+    cout << "width=" << width << "\n";
+    cout << "height=" << height << "\n";
+    cout << "step=" << image.step[0] << "\n";
+    cout << "channels=" << image.channels() << "\n";
+    cout << "type=" << image.type() << "\n";
+    cout << "isContinuous=" << image.isContinuous() << "\n";
+    
+    size_t rowBytes = image.step[0];
 
     /*
     Allocate GPU memory
@@ -409,33 +406,27 @@ int main()
     unsigned char* d_src;
     unsigned char* d_dst;
 
-    CUDA_CHECK(cudaMalloc(
+    cudaMalloc(
         &d_src,
         rowBytes * height
-    ));
+    );
 
-    CUDA_CHECK(cudaMalloc(
+    cudaMalloc(
         &d_dst,
         rowBytes * height
-    ));
+    );
 
     /*
     Copy CPU -> GPU
     */
 
-    CUDA_CHECK(cudaMemcpy(
+    cudaMemcpy(
         d_src,
         image.ptr(),
         rowBytes * height,
         cudaMemcpyHostToDevice
-    ));
+    );
 
-    CUDA_CHECK(cudaMemcpy(
-        d_dst,
-        d_src,
-        rowBytes * height,
-        cudaMemcpyDeviceToDevice
-    ));
 
     /*
     Thread layout
@@ -510,14 +501,14 @@ int main()
 
         int* d_filter;
 
-        CUDA_CHECK(cudaMalloc(&d_filter, 9 * sizeof(int)));
+        cudaMalloc(&d_filter, 9 * sizeof(int));
 
-        CUDA_CHECK(cudaMemcpy(
+        cudaMemcpy(
             d_filter,
             flat,
             9 * sizeof(int),
             cudaMemcpyHostToDevice
-        ));
+        );
 
         auto kernelStart = chrono::high_resolution_clock::now();
 
@@ -531,7 +522,7 @@ int main()
             divisor
         );
 
-        CUDA_CHECK(cudaDeviceSynchronize());
+        cudaDeviceSynchronize();
 
         auto kernelEnd = chrono::high_resolution_clock::now();
         auto kernelMs = chrono::duration_cast<chrono::duration<double, std::milli>>(kernelEnd - kernelStart).count();
@@ -547,7 +538,7 @@ int main()
             d_src, d_dst, rowBytes, width, height
         );
 
-        CUDA_CHECK(cudaDeviceSynchronize());
+        cudaDeviceSynchronize();
 
         auto kernelEnd = chrono::high_resolution_clock::now();
         auto kernelMs = chrono::duration_cast<chrono::duration<double, std::milli>>(kernelEnd - kernelStart).count();
@@ -561,7 +552,7 @@ int main()
             d_src, d_dst, rowBytes, width, height
         );
 
-        CUDA_CHECK(cudaDeviceSynchronize());
+        cudaDeviceSynchronize();
 
         auto kernelEnd = chrono::high_resolution_clock::now();
         auto kernelMs = chrono::duration_cast<chrono::duration<double, std::milli>>(kernelEnd - kernelStart).count();
@@ -575,26 +566,35 @@ int main()
             d_src, d_dst, rowBytes, width, height
         );
 
-        CUDA_CHECK(cudaDeviceSynchronize());
+        cudaDeviceSynchronize();
+        cudaError_t err = cudaGetLastError();
+        cout << "Kernel error: " << cudaGetErrorString(err) << "\n";
 
         auto kernelEnd = chrono::high_resolution_clock::now();
         auto kernelMs = chrono::duration_cast<chrono::duration<double, std::milli>>(kernelEnd - kernelStart).count();
         cout << "Kernel time: " << kernelMs << " ms\n";
     }
 
-    /*
+    // After synchronize, before copying back
+    unsigned char hostSrc[3], hostDst[3];
+    cudaMemcpy(hostSrc, d_src + rowBytes * (height/2) + (width/2)*3, 3, cudaMemcpyDeviceToHost);
+    cudaMemcpy(hostDst, d_dst + rowBytes * (height/2) + (width/2)*3, 3, cudaMemcpyDeviceToHost);
+    cout << "src pixel: " << (int)hostSrc[0] << " " << (int)hostSrc[1] << " " << (int)hostSrc[2] << "\n";
+    cout << "dst pixel: " << (int)hostDst[0] << " " << (int)hostDst[1] << " " << (int)hostDst[2] << "\n";
+        /*
     Copy GPU -> CPU
     */
 
     Mat result(height, width, CV_8UC3);
 
-    CUDA_CHECK(cudaMemcpy(
+    cudaMemcpy(
         result.ptr(),
         d_dst,
         rowBytes * height,
         cudaMemcpyDeviceToHost
-    ));
+    );
 
+    
     /*
     Show result
     */

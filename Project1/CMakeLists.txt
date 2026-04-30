@@ -10,6 +10,7 @@ if (OPENMP_FOUND)
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
+set(OpenCV_DIR "C:/Users/xavie/Downloads/opencv/build/x64/vc16/lib")
 find_package( OpenCV REQUIRED )
 
 add_executable( DisplayImage DisplayImage.cpp )
