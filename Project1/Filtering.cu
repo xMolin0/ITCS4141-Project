@@ -1,28 +1,3 @@
-/*
-============================================================
-CUDA Image Filtering — Readable Version
-
-Same functionality as your original program,
-but rewritten to be easier to study and understand.
-
-Filters included:
-1. LPF blur (divisor 6)
-2. LPF blur (divisor 9)
-3. LPF blur (divisor 10)
-4. LPF blur (divisor 16)
-5. LPF blur (divisor 32)
-6. HPF sharpen (filter 1)
-7. HPF sharpen (filter 2)
-8. HPF sharpen (filter 3)
-9. Median Filter
-10. Min Pixel Filter
-11. Max Pixel Filter
-
-Core CUDA idea:
-    1 thread = 1 pixel
-============================================================
-*/
-
 #include <iostream>
 #include <chrono>
 #include <cuda_runtime.h>
@@ -92,31 +67,7 @@ int hpf_filter_3[3][3] = {
 };
 
 
-/*
-============================================================
-CUDA ERROR CHECKER
-============================================================
-*/
 
-
-/*
-============================================================
-KERNEL 1: CONVOLUTION FILTER
-
-Used for:
-- Blur
-- Sharpen
-- Edge enhancement
-
-Each thread:
-    computes ONE output pixel
-
-It reads the 3x3 neighborhood,
-multiplies by filter weights,
-divides by divisor,
-then clamps result to [0,255].
-============================================================
-*/
 
 __global__ void convolutionKernel(
     unsigned char* src,

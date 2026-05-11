@@ -1,8 +1,3 @@
-/**
- Image Filtering with Convolution
- Implements low-pass blur, high-pass sharpening, median filter, and other spatial filters
- for RGB images using 3x3 neighborhood operations
- */
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/highgui.hpp"
 #include <chrono>
@@ -12,9 +7,7 @@
 using namespace std;
 using namespace cv;
 
-// ============= Filter Masks (from FILTER.C) =============
 
-// Low-pass (blur) filters
 int lpf_filter_6[3][3] = {
     {0, 1, 0},
     {1, 2, 1},
@@ -76,7 +69,7 @@ Mat applyConvolutionFilter(Mat src, int filter[3][3]) {
     int rows = src.rows;
     int cols = src.cols;
 
-    // 🔹 Compute divisor dynamically
+
     int divisor = 0;
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
